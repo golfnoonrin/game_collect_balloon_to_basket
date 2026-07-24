@@ -32,6 +32,7 @@
       border-radius: 24px;
       overflow: hidden;
       box-shadow: inset 0 0 0 2px #7fb39b;
+      background: #8bbf9e;
     }
     #gameCanvas {
       display: block;
@@ -39,6 +40,18 @@
       height: 600px;
       background: #8bbf9e;
       cursor: none;
+    }
+    #webcam-feed {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.25;
+      pointer-events: none;
+      border-radius: 24px;
+      transform: scaleX(-1);
     }
     .status-bar {
       display: flex;
@@ -83,20 +96,18 @@
       border-radius: 40px;
       border: 1px solid #77a58b;
     }
-    #webcam-overlay {
+    .loading {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 1.4rem;
+      background: rgba(0,0,0,0.6);
+      padding: 16px 32px;
+      border-radius: 16px;
       pointer-events: none;
-      border-radius: 24px;
-      opacity: 0.3;
-      object-fit: cover;
-    }
-    .fruit-emoji-big {
-      font-size: 2.2rem;
-      line-height: 1;
+      z-index: 10;
     }
   </style>
 </head>
@@ -105,8 +116,9 @@
 <div class="game-container">
   <div class="canvas-wrapper">
     <canvas id="gameCanvas" width="800" height="600"></canvas>
-    <!-- กล้องแสดงผลแบบโปร่งแสง (overlay) -->
     <video id="webcam" autoplay playsinline style="display: none;"></video>
+    <video id="webcam-feed" autoplay playsinline muted></video>
+    <div class="loading" id="loadingText">⏳ กำลังเปิดกล้อง...</div>
   </div>
   <div class="status-bar">
     <span class="hint">🍎 หยิบ → วางในตะกร้า</span>
@@ -115,89 +127,81 @@
   </div>
 </div>
 
-<!-- โหลด MediaPipe Hands ผ่าน CDN -->
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<!-- ใช้ MediaPipe ผ่าน CDN แบบใหม่ -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
 
 <script>
   (function() {
-    // --- องค์ประกอบเกม ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const scoreSpan = document.getElementById('scoreDisplay');
     const resetBtn = document.getElementById('resetBtn');
     const video = document.getElementById('webcam');
+    const videoFeed = document.getElementById('webcam-feed');
+    const loadingText = document.getElementById('loadingText');
 
-    // ขนาด canvas
     const CW = 800, CH = 600;
 
     // --- สถานะเกม ---
-    let fruits = [];                  // ผลไม้ในฉาก { x, y, emoji, size }
-    let basket = { x: 400, y: 540, w: 140, h: 50 }; // ตะกร้า
+    let fruits = [];
+    const basket = { x: 400, y: 540, w: 140, h: 50 };
     let score = 0;
 
-    // สถานะนิ้ว (จาก MediaPipe)
-    let indexTip = null;    // { x, y } (พิกัดใน canvas)
-    let thumbTip = null;    // { x, y }
-    let pinch = false;     // กำลังหยิบจับ? (นิ้วชี้+นิ้วโป้งใกล้กัน)
-    let isHolding = false; // กำลังถือผลไม้อยู่?
-    let heldFruitIndex = -1; // index ใน fruits ที่กำลังถือ (หรือ -1)
-
-    // ตัวแปรสำหรับตรวจจับการปล่อย ( pinch -> false )
+    // สถานะนิ้ว
+    let indexTip = null;
+    let thumbTip = null;
+    let pinch = false;
     let prevPinch = false;
+    let isHolding = false;
+    let heldFruitIndex = -1;
 
-    // --- สร้างผลไม้เริ่มต้น ---
-    function initFruits(count = 7) {
-      const emojis = ['🍎', '🍐', '🍊', '🍋', '🍇', '🍉', '🍓', '🍑', '🍒', '🥝'];
+    // --- สร้างผลไม้ ---
+    function initFruits(count = 8) {
+      const emojis = ['🍎', '🍐', '🍊', '🍋', '🍇', '🍉', '🍓', '🍑', '🍒', '🥝', '🍌', '🍍'];
       fruits = [];
       for (let i = 0; i < count; i++) {
-        let overlap = true;
+        let x, y, overlap;
         let attempts = 0;
-        let x, y;
-        while (overlap && attempts < 100) {
-          x = 60 + Math.random() * (CW - 120);
-          y = 60 + Math.random() * (380); // ให้ผลไม้อยู๋เหนือตะกร้า
-          overlap = fruits.some(f => Math.hypot(f.x - x, f.y - y) < 50);
+        do {
+          x = 50 + Math.random() * (CW - 100);
+          y = 50 + Math.random() * 380;
+          overlap = fruits.some(f => Math.hypot(f.x - x, f.y - y) < 55);
           attempts++;
-        }
+        } while (overlap && attempts < 50);
         fruits.push({
           x, y,
           emoji: emojis[Math.floor(Math.random() * emojis.length)],
-          size: 30 + Math.floor(Math.random() * 14) // 30~44px
+          size: 32 + Math.floor(Math.random() * 16)
         });
       }
     }
 
-    // --- รีเซ็ตเกม ---
     function resetGame() {
       score = 0;
       updateScore();
-      initFruits(7);
+      initFruits(8);
       isHolding = false;
       heldFruitIndex = -1;
-      // ไม่รีเซ็ต pinch state
+      pinch = false;
+      prevPinch = false;
     }
 
-    // --- อัปเดตคะแนนบน UI ---
     function updateScore() {
       scoreSpan.textContent = score;
     }
 
-    // --- ฟังก์ชันเช็คว่าอยู่ในตะกร้า (เฉพาะส่วนล่าง) ---
     function isOverBasket(x, y) {
       const bx = basket.x - basket.w/2;
       const by = basket.y - basket.h/2;
       return (x >= bx && x <= bx + basket.w && y >= by && y <= by + basket.h);
     }
 
-    // --- หยิบผลไม้ (ถ้าอยู่ใต้นิ้ว) ---
     function tryPickFruit(px, py) {
-      // หาผลไม้ที่อยู่ใกล้ (ระยะ < 50px) และอยู่เหนือตะกร้า (ไม่อยากให้หยิบจากในตะกร้า)
       for (let i = fruits.length - 1; i >= 0; i--) {
         const f = fruits[i];
         const dist = Math.hypot(px - f.x, py - f.y);
         if (dist < 50 && !isOverBasket(f.x, f.y)) {
-          // หยิบผลไม้นี้
           heldFruitIndex = i;
           isHolding = true;
           return true;
@@ -206,28 +210,20 @@
       return false;
     }
 
-    // --- ปล่อยผลไม้ (วางในตะกร้าหรือปล่อยกลางอากาศ) ---
     function dropFruit() {
       if (!isHolding || heldFruitIndex === -1) return false;
 
       const f = fruits[heldFruitIndex];
-      // ตรวจสอบว่าอยู่เหนือตะกร้า (ใช้ตำแหน่งปัจจุบันของผลไม้ที่ตามมือ)
       if (isOverBasket(f.x, f.y)) {
-        // ✅ เก็บใส่ตะกร้า: ลบผลไม้ออก, เพิ่มคะแนน
         fruits.splice(heldFruitIndex, 1);
         score++;
         updateScore();
-        // ถ้าผลไม้เหลือน้อย ให้เติมใหม่
         if (fruits.length < 3) {
           initFruits(5);
         }
       } else {
-        // ❌ วางกลางอากาศ: ผลไม้หล่นลงมา (ปรับ y ลงไปด้านล่าง แต่ไม่หาย)
-        // ปล่อยให้ผลไม้ค้างที่ตำแหน่งมือ (แล้วค่อยๆ ตก? แต่เกมนี้ให้หล่นลงพื้น)
-        f.y = Math.min(f.y + 30, 560); // ตกไปใกล้พื้น
-        // ถ้าตกไปไกลมาก เอากลับขึ้นมาใหม่? (ให้หายไป? แต่เกมนี้ทำให้หายไปแล้วเกิดใหม่)
-        if (f.y > 570) {
-          // ถ้าหล่นออกนอกจอ -> ลบแล้วสร้างใหม่
+        f.y = Math.min(f.y + 40, 580);
+        if (f.y > 580) {
           fruits.splice(heldFruitIndex, 1);
           if (fruits.length < 5) initFruits(3);
         }
@@ -238,67 +234,23 @@
       return true;
     }
 
-    // --- ฟังก์ชันหลักอัปเดตทุกเฟรม (เรียกจาก MediaPipe) ---
-    function updateGame() {
-      // 1. อัปเดตตำแหน่งผลไม้ที่ถือตามนิ้ว
-      if (isHolding && heldFruitIndex !== -1 && indexTip) {
-        const f = fruits[heldFruitIndex];
-        if (f) {
-          f.x = indexTip.x;
-          f.y = indexTip.y;
-          // ป้องกันผลไม้หลุดจากขอบจอ
-          f.x = Math.min(Math.max(f.x, 20), CW - 20);
-          f.y = Math.min(Math.max(f.y, 20), CH - 20);
-        } else {
-          // ถ้าผลไม้ถูกลบไปแล้ว (กรณีผิดพลาด) รีเซ็ตสถานะ
-          isHolding = false;
-          heldFruitIndex = -1;
-        }
-      }
-
-      // 2. ตรวจจับการหยิบ (pinch เปลี่ยนจาก false -> true)
-      if (pinch && !prevPinch && !isHolding && indexTip) {
-        // พยายามหยิบผลไม้ ณ ตำแหน่งนิ้วชี้
-        const picked = tryPickFruit(indexTip.x, indexTip.y);
-        if (!picked) {
-          // ถ้าไม่เจอผลไม้ -> ไม่เกิดอะไร
-        }
-      }
-
-      // 3. ตรวจจับการปล่อย (pinch เปลี่ยนจาก true -> false)
-      if (!pinch && prevPinch && isHolding) {
-        dropFruit();
-      }
-
-      // 4. ถ้าไม่มี pinch และกำลังถืออยู่ (แต่ mediapipe สูญเสีย?) 
-      //   แต่เราไม่ทำอะไร ปล่อยให้ถือต่อไปจนกว่าจะปล่อย
-
-      // อัปเดต prevPinch
-      prevPinch = pinch;
-
-      // --- วาดฉาก ---
-      drawScene();
-    }
-
-    // --- วาดทุกอย่าง ---
+    // --- วาดฉาก ---
     function drawScene() {
       ctx.clearRect(0, 0, CW, CH);
 
-      // 1. พื้นหลัง (หญ้า/ฟ้า)
+      // พื้นหลัง
       const grad = ctx.createLinearGradient(0, 0, 0, CH);
       grad.addColorStop(0, '#b5e0c4');
       grad.addColorStop(0.7, '#7fb39b');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, CW, CH);
 
-      // 2. วาดตะกร้า
+      // วาดตะกร้า
       const bx = basket.x - basket.w/2;
       const by = basket.y - basket.h/2;
       ctx.shadowColor = '#2a4533';
       ctx.shadowBlur = 14;
-      ctx.fillStyle = '#a77b4f';
-      ctx.strokeStyle = '#5d3d27';
-      ctx.lineWidth = 5;
+      
       // ตัวตะกร้า
       ctx.beginPath();
       ctx.ellipse(basket.x, basket.y-4, basket.w/2, basket.h/2.5, 0, 0, Math.PI*2);
@@ -307,16 +259,16 @@
       ctx.strokeStyle = '#5d3d27';
       ctx.lineWidth = 4;
       ctx.stroke();
-      // ขอบตะกร้า (ลายไม้)
+      
       ctx.fillStyle = '#b5875a';
       ctx.shadowBlur = 6;
       ctx.fillRect(bx+10, by-6, basket.w-20, 12);
       ctx.fillStyle = '#8b6a42';
       ctx.fillRect(bx+20, by-2, basket.w-40, 4);
 
-      // 3. วาดผลไม้ทั้งหมด (ยกเว้นตัวที่กำลังถือ, แต่ถ้ากำลังถือ ให้วาดที่ตำแหน่งนิ้ว)
+      // วาดผลไม้
       for (let i = 0; i < fruits.length; i++) {
-        if (isHolding && i === heldFruitIndex) continue; // ข้ามตัวที่ถือ (ไปวาดที่นิ้ว)
+        if (isHolding && i === heldFruitIndex) continue;
         const f = fruits[i];
         ctx.font = `${f.size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
         ctx.textAlign = 'center';
@@ -326,7 +278,7 @@
         ctx.fillText(f.emoji, f.x, f.y);
       }
 
-      // 4. ถ้ากำลังถือ ให้วาดผลไม้ที่นิ้ว (พร้อมเงา)
+      // วาดผลไม้ที่ถือ
       if (isHolding && heldFruitIndex !== -1 && fruits[heldFruitIndex]) {
         const f = fruits[heldFruitIndex];
         ctx.font = `${f.size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
@@ -334,78 +286,108 @@
         ctx.textBaseline = 'middle';
         ctx.shadowBlur = 34;
         ctx.shadowColor = '#2d5a3b';
-        ctx.fillText(f.emoji, indexTip.x, indexTip.y-4);
+        const drawX = indexTip ? indexTip.x : f.x;
+        const drawY = indexTip ? indexTip.y - 4 : f.y;
+        ctx.fillText(f.emoji, drawX, drawY);
+        
         // วงกลมแสดงการหยิบ
+        ctx.shadowBlur = 0;
         ctx.beginPath();
-        ctx.arc(indexTip.x, indexTip.y-4, 24, 0, Math.PI*2);
+        ctx.arc(drawX, drawY, 28, 0, Math.PI*2);
         ctx.strokeStyle = '#f5e56b';
         ctx.lineWidth = 4;
-        ctx.shadowBlur = 18;
         ctx.stroke();
-        ctx.fillStyle = 'rgba(255, 235, 100, 0.2)';
+        ctx.fillStyle = 'rgba(255, 235, 100, 0.15)';
         ctx.fill();
       }
 
-      // 5. แสดงสถานะนิ้ว (UI ช่วย)
+      // แสดงตำแหน่งนิ้ว
+      ctx.shadowBlur = 0;
       if (indexTip) {
-        ctx.shadowBlur = 0;
         ctx.beginPath();
-        ctx.arc(indexTip.x, indexTip.y, 8, 0, 2*Math.PI);
-        ctx.fillStyle = pinch ? '#ffd966' : '#c7e6c7';
+        ctx.arc(indexTip.x, indexTip.y, 10, 0, 2*Math.PI);
+        ctx.fillStyle = pinch ? '#ffd966' : 'rgba(200, 230, 200, 0.7)';
         ctx.strokeStyle = '#2b5c3a';
         ctx.lineWidth = 2;
         ctx.fill();
         ctx.stroke();
+        
+        // เส้นเชื่อมนิ้ว
         if (thumbTip) {
           ctx.beginPath();
-          ctx.arc(thumbTip.x, thumbTip.y, 8, 0, 2*Math.PI);
-          ctx.fillStyle = '#c7e6c7';
+          ctx.moveTo(indexTip.x, indexTip.y);
+          ctx.lineTo(thumbTip.x, thumbTip.y);
+          ctx.strokeStyle = pinch ? '#ffd966' : 'rgba(200, 230, 200, 0.3)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          ctx.beginPath();
+          ctx.arc(thumbTip.x, thumbTip.y, 10, 0, 2*Math.PI);
+          ctx.fillStyle = 'rgba(200, 230, 200, 0.5)';
           ctx.fill();
           ctx.stroke();
         }
       }
 
-      // รีเซ็ต shadow
       ctx.shadowBlur = 0;
     }
 
-    // --- MediaPipe Hands ---
+    // --- MediaPipe ---
     function onResults(results) {
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const landmarks = results.multiHandLandmarks[0];
-        // ดึงตำแหน่งนิ้วชี้ (index 8) และนิ้วโป้ง (index 4)
         const index = landmarks[8];
         const thumb = landmarks[4];
         if (index && thumb) {
-          // แปลงพิกัดจาก 0-1 เป็น canvas
-          indexTip = { x: index.x * CW, y: index.y * CH };
-          thumbTip = { x: thumb.x * CW, y: thumb.y * CH };
-          // ตรวจจับ pinch (ระยะห่าง < 30px)
+          indexTip = { 
+            x: (1 - index.x) * CW,  // กลับด้านให้ตรงกับวิดีโอ
+            y: index.y * CH 
+          };
+          thumbTip = { 
+            x: (1 - thumb.x) * CW,
+            y: thumb.y * CH 
+          };
           const dist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
-          pinch = dist < 32;
-        } else {
-          indexTip = null;
-          thumbTip = null;
-          pinch = false;
+          pinch = dist < 35;
         }
       } else {
-        // ไม่เห็นมือ
-        indexTip = null;
-        thumbTip = null;
-        pinch = false;
-        // ถ้ากำลังถืออยู่ แต่ไม่เจอมือ -> ปล่อยผลไม้ (เพื่อไม่ให้ค้าง)
         if (isHolding) {
           dropFruit();
         }
+        indexTip = null;
+        thumbTip = null;
+        pinch = false;
       }
-      // อัปเดตเกมทุกเฟรม
-      updateGame();
+      
+      // อัปเดตเกม
+      if (pinch && !prevPinch && !isHolding && indexTip) {
+        tryPickFruit(indexTip.x, indexTip.y);
+      }
+      
+      if (!pinch && prevPinch && isHolding) {
+        dropFruit();
+      }
+      
+      prevPinch = pinch;
+      
+      // อัปเดตผลไม้ที่ถือตามนิ้ว
+      if (isHolding && heldFruitIndex !== -1 && indexTip) {
+        const f = fruits[heldFruitIndex];
+        if (f) {
+          f.x = Math.min(Math.max(indexTip.x, 20), CW - 20);
+          f.y = Math.min(Math.max(indexTip.y, 20), CH - 20);
+        }
+      }
+      
+      drawScene();
     }
 
-    // เริ่มต้น MediaPipe
+    // --- เริ่ม MediaPipe ---
     const hands = new Hands({
       locateFile: (file) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`;
       }
     });
 
@@ -418,38 +400,56 @@
 
     hands.onResults(onResults);
 
-    // เปิดกล้อง
-    const camera = new Camera(video, {
-      onFrame: async () => {
-        await hands.send({ image: video });
-      },
-      width: 800,
-      height: 600
-    });
-    camera.start();
+    // --- เปิดกล้อง ---
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { width: 800, height: 600, facingMode: 'user' } 
+        });
+        video.srcObject = stream;
+        videoFeed.srcObject = stream;
+        await video.play();
+        loadingText.style.display = 'none';
+        
+        const camera = new Camera(video, {
+          onFrame: async () => {
+            try {
+              await hands.send({ image: video });
+            } catch (e) {
+              // ignore
+            }
+          },
+          width: 800,
+          height: 600
+        });
+        camera.start();
+      } catch (err) {
+        loadingText.textContent = '❌ ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการเข้าถึงกล้อง';
+        console.error(err);
+      }
+    }
 
     // --- ปุ่มรีเซ็ต ---
     resetBtn.addEventListener('click', () => {
-      resetGame();
-      // ถ้ากำลังถืออยู่ ให้ปล่อย
       if (isHolding) {
         dropFruit();
       }
-      isHolding = false;
-      heldFruitIndex = -1;
-      pinch = false;
-      prevPinch = false;
-      indexTip = null;
-      thumbTip = null;
-      updateGame();
+      resetGame();
+      drawScene();
     });
 
-    // --- เริ่มเกมครั้งแรก ---
+    // --- เริ่มเกม ---
     resetGame();
-    // วาดครั้งแรก
-    updateGame();
+    drawScene();
+    startCamera();
 
-    // (ไม่ต้องแสดงวิดีโอ เพราะใช้เป็น input เท่านั้น)
+    // วาด loop เพิ่มเติม (กันค้าง)
+    setInterval(() => {
+      if (!isHolding && !pinch) {
+        drawScene();
+      }
+    }, 100);
+
   })();
 </script>
 </body>

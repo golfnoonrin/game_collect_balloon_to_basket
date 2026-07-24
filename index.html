@@ -1,727 +1,456 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
-  <base target="_top">
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Melody Garden AR</title>
-  
-  <link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เก็บผลไม้ ใส่ตะกร้า · AR เกม</title>
   <style>
-    * { box-sizing: border-box; user-select: none; }
-    body { font-family: 'Mali', cursive; background: #1e3a2f; margin: 0; overflow: hidden; height: 100vh; width: 100vw; }
-    #app { position: relative; width: 100vw; height: 100vh; overflow: hidden; background: #2d5a3d; }
-    #gameCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; object-fit: cover; background: #1d3b2a; }
-    .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-    .ui-overlay > * { pointer-events: auto; }
-    #hud { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); color: white; font-weight: 600; text-shadow: 0 2px 6px rgba(0,0,0,0.5); flex-wrap: wrap; gap: 8px; position: relative; z-index: 10; }
-    #hud > div { display: flex; align-items: center; gap: 12px; font-size: 1.1rem; }
-    #missionLabel { background: #fbbf24; color: #1e293b; padding: 6px 18px; border-radius: 40px; font-size: 1.2rem; box-shadow: 0 4px 0 #a16207; }
-    #scoreLabel { background: #34d399; color: #064e3b; padding: 6px 18px; border-radius: 40px; }
-    #timerLabel { background: #f87171; color: #7f1d1d; padding: 6px 18px; border-radius: 40px; }
-    #hint { text-align: center; color: #fde68a; font-size: 1.2rem; padding: 6px; background: rgba(0,0,0,0.3); backdrop-filter: blur(2px); margin: 8px 20px 12px; border-radius: 60px; position: relative; z-index: 10; }
-    #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(26, 54, 33, 0.85); backdrop-filter: blur(8px); color: white; padding: 20px; text-align: center; z-index: 20; pointer-events: auto; }
-    #startScreen h1 { font-size: 3.8rem; margin: 0; text-shadow: 0 8px 0 #0f2b1a; letter-spacing: 2px; }
-    #startScreen .sub { font-size: 1.5rem; background: #fbbf24; color: #1e293b; padding: 8px 30px; border-radius: 60px; display: inline-block; margin: 12px 0; }
-    #startBtn { background: #facc15; border: none; color: #1e293b; font-size: 2rem; padding: 16px 56px; border-radius: 80px; font-weight: 700; box-shadow: 0 8px 0 #a16207; transition: 0.05s linear; cursor: pointer; pointer-events: auto; margin-top: 20px; font-family: 'Mali', cursive; }
-    #startBtn:active { transform: translateY(6px); box-shadow: 0 2px 0 #a16207; }
-    .rules { max-width: 480px; background: rgba(255,255,220,0.1); padding: 18px 28px; border-radius: 60px; margin: 20px; font-size: 1.1rem; border: 2px dashed #fde68a; }
-    #certModal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; z-index: 30; pointer-events: auto; }
-    .cert-card { background: linear-gradient(145deg, #fef3c7, #fde68a); max-width: 440px; width: 90%; padding: 30px 24px; border-radius: 60px 20px 60px 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); text-align: center; color: #1e293b; border: 4px solid #b45309; position: relative; pointer-events: auto; }
-    .cert-card h2 { font-size: 2.4rem; margin: 0; }
-    .cert-card .score-big { font-size: 4rem; font-weight: 700; background: #1e293b; color: #fbbf24; padding: 0 20px; border-radius: 40px; display: inline-block; margin: 8px 0; }
-    .cert-card input { background: transparent; border: none; border-bottom: 3px dashed #92400e; font-size: 2rem; text-align: center; width: 80%; font-family: 'Mali', cursive; color: #1e293b; outline: none; margin: 12px 0; }
-    .cert-card .actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
-    .cert-card .actions button { background: #1e293b; border: none; color: white; font-size: 1.2rem; padding: 12px 24px; border-radius: 60px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 0 #0f172a; transition: 0.05s linear; font-family: 'Mali', cursive; }
-    .cert-card .actions button:active { transform: translateY(4px); box-shadow: 0 0px 0 #0f172a; }
-    .cert-card .actions .capture-btn { background: #16a34a; box-shadow: 0 4px 0 #14532d; }
-    #fxCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
-    @media (max-width: 600px) {
-      #startScreen h1 { font-size: 2.8rem; }
-      #hud { font-size: 0.9rem; padding: 6px 10px; }
-      #missionLabel, #scoreLabel, #timerLabel { padding: 4px 12px; font-size: 0.9rem; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+    }
+    body {
+      background: #0b2b1e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    .game-container {
+      background: #1e4d3a;
+      padding: 20px;
+      border-radius: 40px 40px 20px 20px;
+      box-shadow: 0 20px 30px rgba(0,0,0,0.6);
+      display: inline-block;
+      position: relative;
+    }
+    .canvas-wrapper {
+      position: relative;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 2px #7fb39b;
+    }
+    #gameCanvas {
+      display: block;
+      width: 800px;
+      height: 600px;
+      background: #8bbf9e;
+      cursor: none;
+    }
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 16px;
+      padding: 0 10px;
+      color: #f3f7e8;
+      font-weight: 600;
+      font-size: 1.2rem;
+      text-shadow: 1px 2px 3px #1a2f25;
+    }
+    .score-box {
+      background: #2c5d45;
+      padding: 8px 24px;
+      border-radius: 40px;
+      border: 1px solid #b1d5b9;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .reset-btn {
+      background: #b75f4a;
+      border: none;
+      color: white;
+      font-weight: bold;
+      padding: 8px 24px;
+      border-radius: 40px;
+      font-size: 1.1rem;
+      box-shadow: 0 4px 0 #6f3d2e;
+      transition: 0.08s linear;
+      cursor: pointer;
+      border: 1px solid #e3b49a;
+    }
+    .reset-btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 0 0 #6f3d2e;
+    }
+    .hint {
+      color: #d4e8d0;
+      font-size: 0.9rem;
+      background: #1f3f30;
+      padding: 4px 18px;
+      border-radius: 40px;
+      border: 1px solid #77a58b;
+    }
+    #webcam-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      border-radius: 24px;
+      opacity: 0.3;
+      object-fit: cover;
+    }
+    .fruit-emoji-big {
+      font-size: 2.2rem;
+      line-height: 1;
     }
   </style>
 </head>
 <body>
-<div id="app">
-  <canvas id="gameCanvas"></canvas>
-  <canvas id="fxCanvas"></canvas>
 
-  <div class="ui-overlay" id="uiOverlay">
-    <div id="hud">
-      <div><span id="timerLabel">⏱ 60s</span></div>
-      <div><span id="missionLabel">🎯 🍎</span></div>
-      <div><span id="scoreLabel">⭐ 0</span></div>
-    </div>
-    <div id="hint">🧺 หยิบโน้ตให้ตรงกับภารกิจ แล้วปล่อยในตะกร้าสีทองด้านล่าง</div>
-
-    <div id="startScreen">
-      <h1>🌿 Melody Garden</h1>
-      <div class="sub">🎵 สวนเสียงเพลง AR</div>
-      <div class="rules">
-        ✋ ใช้มือจีบ (นิ้วโป้ง+ชี้) หยิบโน้ต<br>
-        🎯 ปล่อยในตะกร้าให้ตรงภารกิจ<br>
-        ⏱ 60 วินาที เก็บคะแนนให้ได้มากที่สุด
-      </div>
-      <button id="startBtn">▶ เริ่มเล่น</button>
-    </div>
-
-    <div id="certModal">
-      <div class="cert-card" id="certCard">
-        <h2>🏆 เกียรติบัตร</h2>
-        <div style="font-size:1.2rem;">🌻 Melody Garden</div>
-        <input type="text" id="playerNameInput" placeholder="ชื่อเด็ก" value="น้องต้นกล้า">
-        <div class="score-big" id="finalScoreDisplay">0</div>
-        <div style="font-size:1.2rem;">คะแนน</div>
-        <div class="actions">
-          <button id="retryBtn">🔄 เล่นอีกครั้ง</button>
-          <button class="capture-btn" id="captureBtn">📸 บันทึกเกียรติบัตร</button>
-        </div>
-      </div>
-    </div>
+<div class="game-container">
+  <div class="canvas-wrapper">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <!-- กล้องแสดงผลแบบโปร่งแสง (overlay) -->
+    <video id="webcam" autoplay playsinline style="display: none;"></video>
+  </div>
+  <div class="status-bar">
+    <span class="hint">🍎 หยิบ → วางในตะกร้า</span>
+    <span class="score-box">🧺 <span id="scoreDisplay">0</span></span>
+    <button class="reset-btn" id="resetBtn">🔄 เริ่มใหม่</button>
   </div>
 </div>
 
+<!-- โหลด MediaPipe Hands ผ่าน CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
 <script>
-(function() {
-  // STATE
-  var state = {
-    running: false,
-    timeLeft: 60,
-    score: 0,
-    mission: null,
-    items: [],
-    dragging: null,
-    pinched: false,
-    prevPinched: false,
-    gameLoop: null,
-    timerInterval: null,
-    basket: { x: 0, y: 0, w: 0, h: 0 },
-    handLandmarks: null
-  };
+  (function() {
+    // --- องค์ประกอบเกม ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreSpan = document.getElementById('scoreDisplay');
+    const resetBtn = document.getElementById('resetBtn');
+    const video = document.getElementById('webcam');
 
-  // DATA
-  var PITCH_NOTES = [
-    { name: 'โด', color: '#ef4444', emoji: '🍎', pitch: 'C4' },
-    { name: 'เร', color: '#f97316', emoji: '🍊', pitch: 'D4' },
-    { name: 'มี', color: '#eab308', emoji: '🍌', pitch: 'E4' },
-    { name: 'ฟา', color: '#22c55e', emoji: '🍏', pitch: 'F4' },
-    { name: 'ซอล', color: '#3b82f6', emoji: '💧', pitch: 'G4' },
-    { name: 'ลา', color: '#a855f7', emoji: '🍇', pitch: 'A4' },
-    { name: 'ที', color: '#ec4899', emoji: '🌸', pitch: 'B4' }
-  ];
-  var DURATION_NOTES = [
-    { name: 'ตัวกลม', color: '#1e293b', emoji: '𝅝', duration: '4n' },
-    { name: 'ตัวขาว', color: '#334155', emoji: '𝅗𝅥', duration: '2n' },
-    { name: 'ตัวดำ', color: '#475569', emoji: '𝅘𝅥', duration: '4n' },
-    { name: 'เขบ็ต1', color: '#64748b', emoji: '𝅘𝅥𝅮', duration: '8n' },
-    { name: 'เขบ็ต2', color: '#94a3b8', emoji: '𝅘𝅥𝅯', duration: '16n' }
-  ];
-  var ALL_NOTES = PITCH_NOTES.concat(DURATION_NOTES);
+    // ขนาด canvas
+    const CW = 800, CH = 600;
 
-  // DOM refs
-  var canvas = document.getElementById('gameCanvas');
-  var ctx = canvas.getContext('2d');
-  var fxCanvas = document.getElementById('fxCanvas');
-  var fxCtx = fxCanvas.getContext('2d');
-  var startScreen = document.getElementById('startScreen');
-  var startBtn = document.getElementById('startBtn');
-  var certModal = document.getElementById('certModal');
-  var retryBtn = document.getElementById('retryBtn');
-  var captureBtn = document.getElementById('captureBtn');
-  var playerNameInput = document.getElementById('playerNameInput');
-  var finalScoreDisplay = document.getElementById('finalScoreDisplay');
-  var timerLabel = document.getElementById('timerLabel');
-  var missionLabel = document.getElementById('missionLabel');
-  var scoreLabel = document.getElementById('scoreLabel');
+    // --- สถานะเกม ---
+    let fruits = [];                  // ผลไม้ในฉาก { x, y, emoji, size }
+    let basket = { x: 400, y: 540, w: 140, h: 50 }; // ตะกร้า
+    let score = 0;
 
-  // Resize
-  function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    fxCanvas.width = window.innerWidth;
-    fxCanvas.height = window.innerHeight;
-    state.basket.w = Math.min(220, window.innerWidth * 0.6);
-    state.basket.h = 70;
-    state.basket.x = (window.innerWidth - state.basket.w) / 2;
-    state.basket.y = window.innerHeight - 100;
-  }
-  window.addEventListener('resize', resizeCanvas);
-  resizeCanvas();
+    // สถานะนิ้ว (จาก MediaPipe)
+    let indexTip = null;    // { x, y } (พิกัดใน canvas)
+    let thumbTip = null;    // { x, y }
+    let pinch = false;     // กำลังหยิบจับ? (นิ้วชี้+นิ้วโป้งใกล้กัน)
+    let isHolding = false; // กำลังถือผลไม้อยู่?
+    let heldFruitIndex = -1; // index ใน fruits ที่กำลังถือ (หรือ -1)
 
-  // Tone
-  var toneStarted = false;
-  function initTone() {
-    if (!toneStarted && window.Tone && Tone.context.state !== 'running') {
-      Tone.start().then(function() {
-        toneStarted = true;
-      }).catch(function(e) {});
-    }
-  }
-  
-  function playNote(noteData) {
-    try {
-      if (!window.Tone) return;
-      var synth = new Tone.Synth().toDestination();
-      if (noteData.pitch) {
-        synth.triggerAttackRelease(noteData.pitch, '4n');
-      } else if (noteData.duration) {
-        synth.triggerAttackRelease('C4', noteData.duration);
+    // ตัวแปรสำหรับตรวจจับการปล่อย ( pinch -> false )
+    let prevPinch = false;
+
+    // --- สร้างผลไม้เริ่มต้น ---
+    function initFruits(count = 7) {
+      const emojis = ['🍎', '🍐', '🍊', '🍋', '🍇', '🍉', '🍓', '🍑', '🍒', '🥝'];
+      fruits = [];
+      for (let i = 0; i < count; i++) {
+        let overlap = true;
+        let attempts = 0;
+        let x, y;
+        while (overlap && attempts < 100) {
+          x = 60 + Math.random() * (CW - 120);
+          y = 60 + Math.random() * (380); // ให้ผลไม้อยู๋เหนือตะกร้า
+          overlap = fruits.some(f => Math.hypot(f.x - x, f.y - y) < 50);
+          attempts++;
+        }
+        fruits.push({
+          x, y,
+          emoji: emojis[Math.floor(Math.random() * emojis.length)],
+          size: 30 + Math.floor(Math.random() * 14) // 30~44px
+        });
       }
-    } catch(e) {}
-  }
-  
-  function playError() {
-    try {
-      if (!window.Tone) return;
-      var synth = new Tone.Synth().toDestination();
-      synth.triggerAttackRelease('G3', '8n');
-    } catch(e) {}
-  }
-
-  // Random Mission
-  function randomMission() {
-    var idx = Math.floor(Math.random() * ALL_NOTES.length);
-    state.mission = { 
-      name: ALL_NOTES[idx].name,
-      color: ALL_NOTES[idx].color,
-      emoji: ALL_NOTES[idx].emoji,
-      pitch: ALL_NOTES[idx].pitch || null,
-      duration: ALL_NOTES[idx].duration || null
-    };
-    missionLabel.innerHTML = '🎯 ' + state.mission.emoji + ' ' + state.mission.name;
-  }
-
-  // Spawn Item
-  function spawnItem() {
-    if (!state.running) return;
-    var base = ALL_NOTES[Math.floor(Math.random() * ALL_NOTES.length)];
-    var x = 40 + Math.random() * (canvas.width - 100);
-    var size = 44 + Math.random() * 16;
-    state.items.push({
-      name: base.name,
-      color: base.color,
-      emoji: base.emoji,
-      pitch: base.pitch || null,
-      duration: base.duration || null,
-      x: x,
-      y: -60,
-      size: size,
-      speed: 1.8 + Math.random() * 1.6
-    });
-  }
-
-  // MediaPipe
-  var videoElement = null;
-  var handsInstance = null;
-  var cameraInstance = null;
-
-  function setupMediaPipe() {
-    function loadScript(src) {
-      return new Promise(function(resolve, reject) {
-        var script = document.createElement('script');
-        script.src = src;
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-      });
     }
 
-    return loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js')
-      .then(function() {
-        return loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
-      })
-      .then(function() {
-        if (typeof Hands !== 'undefined') {
-          handsInstance = new Hands({
-            locateFile: function(file) {
-              return 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/' + file;
-            }
-          });
-          
-          handsInstance.setOptions({
-            maxNumHands: 2,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
-          });
-          
-          handsInstance.onResults(function(results) {
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-              state.handLandmarks = results.multiHandLandmarks;
-            } else {
-              state.handLandmarks = null;
-            }
-          });
-          
+    // --- รีเซ็ตเกม ---
+    function resetGame() {
+      score = 0;
+      updateScore();
+      initFruits(7);
+      isHolding = false;
+      heldFruitIndex = -1;
+      // ไม่รีเซ็ต pinch state
+    }
+
+    // --- อัปเดตคะแนนบน UI ---
+    function updateScore() {
+      scoreSpan.textContent = score;
+    }
+
+    // --- ฟังก์ชันเช็คว่าอยู่ในตะกร้า (เฉพาะส่วนล่าง) ---
+    function isOverBasket(x, y) {
+      const bx = basket.x - basket.w/2;
+      const by = basket.y - basket.h/2;
+      return (x >= bx && x <= bx + basket.w && y >= by && y <= by + basket.h);
+    }
+
+    // --- หยิบผลไม้ (ถ้าอยู่ใต้นิ้ว) ---
+    function tryPickFruit(px, py) {
+      // หาผลไม้ที่อยู่ใกล้ (ระยะ < 50px) และอยู่เหนือตะกร้า (ไม่อยากให้หยิบจากในตะกร้า)
+      for (let i = fruits.length - 1; i >= 0; i--) {
+        const f = fruits[i];
+        const dist = Math.hypot(px - f.x, py - f.y);
+        if (dist < 50 && !isOverBasket(f.x, f.y)) {
+          // หยิบผลไม้นี้
+          heldFruitIndex = i;
+          isHolding = true;
           return true;
         }
-        return false;
-      })
-      .catch(function() { return false; });
-  }
+      }
+      return false;
+    }
 
-  // Camera
-  function startCamera() {
-    return navigator.mediaDevices.getUserMedia({ 
-      video: { facingMode: 'user', width: 640, height: 480 } 
-    }).then(function(stream) {
-      var video = document.createElement('video');
-      video.srcObject = stream;
-      video.play();
-      return video;
-    }).catch(function() {
-      return null;
-    });
-  }
+    // --- ปล่อยผลไม้ (วางในตะกร้าหรือปล่อยกลางอากาศ) ---
+    function dropFruit() {
+      if (!isHolding || heldFruitIndex === -1) return false;
 
-  // Game Loop
-  var lastTime = 0;
-
-  function gameLoop(time) {
-    if (!state.running) return;
-    var dt = (time - lastTime) / 1000;
-    lastTime = time;
-
-    updateGame(dt);
-    drawFrame();
-    requestAnimationFrame(gameLoop);
-  }
-
-  function updateGame(dt) {
-    if (Math.random() < 0.035) spawnItem();
-
-    for (var i = state.items.length - 1; i >= 0; i--) {
-      var item = state.items[i];
-      if (state.dragging && state.dragging.item === item) {
-        var hand = state.handLandmarks;
-        if (hand && hand.length > 0) {
-          var lm = hand[0][8];
-          var x = (1 - lm.x) * canvas.width;
-          var y = lm.y * canvas.height;
-          item.x = x + state.dragging.offsetX;
-          item.y = y + state.dragging.offsetY;
+      const f = fruits[heldFruitIndex];
+      // ตรวจสอบว่าอยู่เหนือตะกร้า (ใช้ตำแหน่งปัจจุบันของผลไม้ที่ตามมือ)
+      if (isOverBasket(f.x, f.y)) {
+        // ✅ เก็บใส่ตะกร้า: ลบผลไม้ออก, เพิ่มคะแนน
+        fruits.splice(heldFruitIndex, 1);
+        score++;
+        updateScore();
+        // ถ้าผลไม้เหลือน้อย ให้เติมใหม่
+        if (fruits.length < 3) {
+          initFruits(5);
         }
-        continue;
-      }
-      item.y += item.speed * 1.6;
-      
-      if (item.y > state.basket.y && item.y < state.basket.y + state.basket.h + 10 &&
-          item.x > state.basket.x && item.x < state.basket.x + state.basket.w) {
-        if (state.mission && (item.name === state.mission.name)) {
-          state.score += 10;
-          scoreLabel.innerHTML = '⭐ ' + state.score;
-          showFloatingText(item.x, item.y - 20, '+10', '#facc15');
-          playNote(state.mission);
-          randomMission();
-          state.items.splice(i, 1);
-          continue;
-        } else {
-          playError();
-          showFloatingText(item.x, item.y - 20, '❌', '#f87171');
-          state.items.splice(i, 1);
-          continue;
-        }
-      }
-      if (item.y > canvas.height + 60) {
-        state.items.splice(i, 1);
-      }
-    }
-
-    var hand = state.handLandmarks;
-    if (hand && hand.length > 0) {
-      var lm = hand[0];
-      var thumb = lm[4];
-      var index = lm[8];
-      var dx = thumb.x - index.x;
-      var dy = thumb.y - index.y;
-      var dist = Math.sqrt(dx*dx + dy*dy);
-      var pinched = dist < 0.06;
-      state.pinched = pinched;
-
-      if (pinched && !state.prevPinched) {
-        var mx = (1 - index.x) * canvas.width;
-        var my = index.y * canvas.height;
-        for (var j = state.items.length - 1; j >= 0; j--) {
-          var item2 = state.items[j];
-          var dx2 = mx - item2.x;
-          var dy2 = my - item2.y;
-          if (Math.sqrt(dx2*dx2 + dy2*dy2) < item2.size / 1.8) {
-            state.dragging = { item: item2, offsetX: item2.x - mx, offsetY: item2.y - my };
-            break;
-          }
-        }
-      }
-      if (!pinched && state.prevPinched) {
-        if (state.dragging) {
-          var item3 = state.dragging.item;
-          if (item3.y > state.basket.y && item3.y < state.basket.y + state.basket.h + 10 &&
-              item3.x > state.basket.x && item3.x < state.basket.x + state.basket.w) {
-            if (state.mission && (item3.name === state.mission.name)) {
-              state.score += 10;
-              scoreLabel.innerHTML = '⭐ ' + state.score;
-              showFloatingText(item3.x, item3.y - 20, '+10', '#facc15');
-              playNote(state.mission);
-              randomMission();
-              var idx = state.items.indexOf(item3);
-              if (idx !== -1) state.items.splice(idx, 1);
-            } else {
-              playError();
-              showFloatingText(item3.x, item3.y - 20, '❌', '#f87171');
-              var idx2 = state.items.indexOf(item3);
-              if (idx2 !== -1) state.items.splice(idx2, 1);
-            }
-          }
-          state.dragging = null;
-        }
-      }
-      state.prevPinched = pinched;
-    } else {
-      state.pinched = false;
-      state.prevPinched = false;
-      if (state.dragging) state.dragging = null;
-    }
-  }
-
-  function drawFrame() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#1d3b2a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    if (videoElement && videoElement.readyState >= 2) {
-      ctx.save();
-      ctx.scale(-1, 1);
-      ctx.drawImage(videoElement, -canvas.width, 0, canvas.width, canvas.height);
-      ctx.restore();
-    }
-    
-    if (state.handLandmarks && state.handLandmarks.length > 0) {
-      var landmarks = state.handLandmarks;
-      for (var h = 0; h < landmarks.length; h++) {
-        var hand = landmarks[h];
-        var pts = [];
-        for (var k = 0; k < hand.length; k++) {
-          pts.push({ 
-            x: (1 - hand[k].x) * canvas.width, 
-            y: hand[k].y * canvas.height 
-          });
-        }
-        
-        for (var p = 0; p < pts.length; p++) {
-          ctx.beginPath();
-          ctx.arc(pts[p].x, pts[p].y, 8, 0, 2 * Math.PI);
-          ctx.fillStyle = '#facc15';
-          ctx.shadowColor = '#facc15';
-          ctx.shadowBlur = 20;
-          ctx.fill();
-        }
-        
-        ctx.shadowBlur = 8;
-        ctx.strokeStyle = '#4ade80';
-        ctx.lineWidth = 5;
-        var connections = [
-          [0,1],[1,2],[2,3],[3,4],
-          [0,5],[5,6],[6,7],[7,8],
-          [0,9],[9,10],[10,11],[11,12],
-          [0,13],[13,14],[14,15],[15,16],
-          [0,17],[17,18],[18,19],[19,20]
-        ];
-        for (var c = 0; c < connections.length; c++) {
-          var ci = connections[c][0];
-          var cj = connections[c][1];
-          if (pts[ci] && pts[cj]) {
-            ctx.beginPath();
-            ctx.moveTo(pts[ci].x, pts[ci].y);
-            ctx.lineTo(pts[cj].x, pts[cj].y);
-            ctx.stroke();
-          }
-        }
-      }
-    }
-    
-    for (var m = 0; m < state.items.length; m++) {
-      var item = state.items[m];
-      var isDrag = state.dragging && state.dragging.item === item;
-      var sz = isDrag ? item.size * 1.6 : item.size;
-      ctx.shadowBlur = isDrag ? 40 : 12;
-      ctx.shadowColor = '#fbbf24';
-      ctx.beginPath();
-      ctx.arc(item.x, item.y, sz/2, 0, 2 * Math.PI);
-      ctx.fillStyle = item.color || '#64748b';
-      ctx.fill();
-      ctx.fillStyle = 'white';
-      ctx.font = (sz * 0.6) + 'px Mali, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(item.emoji || '🎵', item.x, item.y - 2);
-      if (isDrag) {
-        ctx.shadowBlur = 60;
-        ctx.strokeStyle = '#fde047';
-        ctx.lineWidth = 6;
-        ctx.stroke();
-      }
-    }
-    
-    ctx.shadowBlur = 30;
-    ctx.shadowColor = '#fbbf24';
-    ctx.fillStyle = '#fcd34d';
-    ctx.beginPath();
-    roundRect(ctx, state.basket.x, state.basket.y, state.basket.w, state.basket.h, 30);
-    ctx.fill();
-    ctx.fillStyle = '#92400e';
-    ctx.font = '28px Mali, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('🧺 ตะกร้าโน้ต', state.basket.x + state.basket.w/2, state.basket.y + state.basket.h/2);
-    ctx.shadowBlur = 0;
-  }
-
-  function roundRect(ctx, x, y, w, h, r) {
-    if (w < 2 * r) r = w / 2;
-    if (h < 2 * r) r = h / 2;
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-  }
-
-  function showFloatingText(x, y, text, color) {
-    fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
-    fxCtx.font = 'bold 48px Mali, sans-serif';
-    fxCtx.textAlign = 'center';
-    fxCtx.textBaseline = 'middle';
-    fxCtx.shadowColor = color;
-    fxCtx.shadowBlur = 40;
-    fxCtx.fillStyle = color;
-    fxCtx.fillText(text, x, y);
-    setTimeout(function() {
-      fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
-    }, 800);
-  }
-
-  // Timer
-  function startTimer() {
-    state.timeLeft = 60;
-    timerLabel.innerHTML = '⏱ 60s';
-    state.timerInterval = setInterval(function() {
-      state.timeLeft--;
-      timerLabel.innerHTML = '⏱ ' + state.timeLeft + 's';
-      if (state.timeLeft <= 0) {
-        clearInterval(state.timerInterval);
-        endGame();
-      }
-    }, 1000);
-  }
-
-  // End Game
-  function endGame() {
-    state.running = false;
-    if (state.timerInterval) clearInterval(state.timerInterval);
-    if (videoElement && videoElement.srcObject) {
-      videoElement.srcObject.getTracks().forEach(function(t) { t.stop(); });
-    }
-    if (handsInstance) {
-      try { handsInstance.close(); } catch(e) {}
-    }
-    if (cameraInstance) {
-      try { cameraInstance.stop(); } catch(e) {}
-    }
-    certModal.style.display = 'flex';
-    finalScoreDisplay.textContent = state.score;
-  }
-
-  // Start Game
-  function startGame() {
-    initTone();
-    startScreen.style.display = 'none';
-    certModal.style.display = 'none';
-    state.score = 0;
-    state.items = [];
-    state.dragging = null;
-    state.running = true;
-    state.handLandmarks = null;
-    scoreLabel.innerHTML = '⭐ 0';
-    randomMission();
-    resizeCanvas();
-    
-    startCamera().then(function(video) {
-      if (video) {
-        videoElement = video;
       } else {
-        videoElement = null;
+        // ❌ วางกลางอากาศ: ผลไม้หล่นลงมา (ปรับ y ลงไปด้านล่าง แต่ไม่หาย)
+        // ปล่อยให้ผลไม้ค้างที่ตำแหน่งมือ (แล้วค่อยๆ ตก? แต่เกมนี้ให้หล่นลงพื้น)
+        f.y = Math.min(f.y + 30, 560); // ตกไปใกล้พื้น
+        // ถ้าตกไปไกลมาก เอากลับขึ้นมาใหม่? (ให้หายไป? แต่เกมนี้ทำให้หายไปแล้วเกิดใหม่)
+        if (f.y > 570) {
+          // ถ้าหล่นออกนอกจอ -> ลบแล้วสร้างใหม่
+          fruits.splice(heldFruitIndex, 1);
+          if (fruits.length < 5) initFruits(3);
+        }
       }
-      
-      return setupMediaPipe();
-    }).then(function(mpLoaded) {
-      if (mpLoaded && handsInstance && videoElement) {
-        try {
-          cameraInstance = new Camera(videoElement, {
-            onFrame: function() {
-              if (handsInstance) {
-                handsInstance.send({image: videoElement});
-              }
-            },
-            width: 640,
-            height: 480
-          });
-          cameraInstance.start();
-        } catch(e) {}
+
+      isHolding = false;
+      heldFruitIndex = -1;
+      return true;
+    }
+
+    // --- ฟังก์ชันหลักอัปเดตทุกเฟรม (เรียกจาก MediaPipe) ---
+    function updateGame() {
+      // 1. อัปเดตตำแหน่งผลไม้ที่ถือตามนิ้ว
+      if (isHolding && heldFruitIndex !== -1 && indexTip) {
+        const f = fruits[heldFruitIndex];
+        if (f) {
+          f.x = indexTip.x;
+          f.y = indexTip.y;
+          // ป้องกันผลไม้หลุดจากขอบจอ
+          f.x = Math.min(Math.max(f.x, 20), CW - 20);
+          f.y = Math.min(Math.max(f.y, 20), CH - 20);
+        } else {
+          // ถ้าผลไม้ถูกลบไปแล้ว (กรณีผิดพลาด) รีเซ็ตสถานะ
+          isHolding = false;
+          heldFruitIndex = -1;
+        }
       }
-      
-      lastTime = performance.now();
-      if (state.gameLoop) cancelAnimationFrame(state.gameLoop);
-      state.gameLoop = requestAnimationFrame(gameLoop);
-      startTimer();
+
+      // 2. ตรวจจับการหยิบ (pinch เปลี่ยนจาก false -> true)
+      if (pinch && !prevPinch && !isHolding && indexTip) {
+        // พยายามหยิบผลไม้ ณ ตำแหน่งนิ้วชี้
+        const picked = tryPickFruit(indexTip.x, indexTip.y);
+        if (!picked) {
+          // ถ้าไม่เจอผลไม้ -> ไม่เกิดอะไร
+        }
+      }
+
+      // 3. ตรวจจับการปล่อย (pinch เปลี่ยนจาก true -> false)
+      if (!pinch && prevPinch && isHolding) {
+        dropFruit();
+      }
+
+      // 4. ถ้าไม่มี pinch และกำลังถืออยู่ (แต่ mediapipe สูญเสีย?) 
+      //   แต่เราไม่ทำอะไร ปล่อยให้ถือต่อไปจนกว่าจะปล่อย
+
+      // อัปเดต prevPinch
+      prevPinch = pinch;
+
+      // --- วาดฉาก ---
+      drawScene();
+    }
+
+    // --- วาดทุกอย่าง ---
+    function drawScene() {
+      ctx.clearRect(0, 0, CW, CH);
+
+      // 1. พื้นหลัง (หญ้า/ฟ้า)
+      const grad = ctx.createLinearGradient(0, 0, 0, CH);
+      grad.addColorStop(0, '#b5e0c4');
+      grad.addColorStop(0.7, '#7fb39b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, CW, CH);
+
+      // 2. วาดตะกร้า
+      const bx = basket.x - basket.w/2;
+      const by = basket.y - basket.h/2;
+      ctx.shadowColor = '#2a4533';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = '#a77b4f';
+      ctx.strokeStyle = '#5d3d27';
+      ctx.lineWidth = 5;
+      // ตัวตะกร้า
+      ctx.beginPath();
+      ctx.ellipse(basket.x, basket.y-4, basket.w/2, basket.h/2.5, 0, 0, Math.PI*2);
+      ctx.fillStyle = '#c69c6d';
+      ctx.fill();
+      ctx.strokeStyle = '#5d3d27';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      // ขอบตะกร้า (ลายไม้)
+      ctx.fillStyle = '#b5875a';
+      ctx.shadowBlur = 6;
+      ctx.fillRect(bx+10, by-6, basket.w-20, 12);
+      ctx.fillStyle = '#8b6a42';
+      ctx.fillRect(bx+20, by-2, basket.w-40, 4);
+
+      // 3. วาดผลไม้ทั้งหมด (ยกเว้นตัวที่กำลังถือ, แต่ถ้ากำลังถือ ให้วาดที่ตำแหน่งนิ้ว)
+      for (let i = 0; i < fruits.length; i++) {
+        if (isHolding && i === heldFruitIndex) continue; // ข้ามตัวที่ถือ (ไปวาดที่นิ้ว)
+        const f = fruits[i];
+        ctx.font = `${f.size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#1e3d2a';
+        ctx.fillText(f.emoji, f.x, f.y);
+      }
+
+      // 4. ถ้ากำลังถือ ให้วาดผลไม้ที่นิ้ว (พร้อมเงา)
+      if (isHolding && heldFruitIndex !== -1 && fruits[heldFruitIndex]) {
+        const f = fruits[heldFruitIndex];
+        ctx.font = `${f.size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 34;
+        ctx.shadowColor = '#2d5a3b';
+        ctx.fillText(f.emoji, indexTip.x, indexTip.y-4);
+        // วงกลมแสดงการหยิบ
+        ctx.beginPath();
+        ctx.arc(indexTip.x, indexTip.y-4, 24, 0, Math.PI*2);
+        ctx.strokeStyle = '#f5e56b';
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 18;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255, 235, 100, 0.2)';
+        ctx.fill();
+      }
+
+      // 5. แสดงสถานะนิ้ว (UI ช่วย)
+      if (indexTip) {
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(indexTip.x, indexTip.y, 8, 0, 2*Math.PI);
+        ctx.fillStyle = pinch ? '#ffd966' : '#c7e6c7';
+        ctx.strokeStyle = '#2b5c3a';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+        if (thumbTip) {
+          ctx.beginPath();
+          ctx.arc(thumbTip.x, thumbTip.y, 8, 0, 2*Math.PI);
+          ctx.fillStyle = '#c7e6c7';
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      // รีเซ็ต shadow
+      ctx.shadowBlur = 0;
+    }
+
+    // --- MediaPipe Hands ---
+    function onResults(results) {
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        // ดึงตำแหน่งนิ้วชี้ (index 8) และนิ้วโป้ง (index 4)
+        const index = landmarks[8];
+        const thumb = landmarks[4];
+        if (index && thumb) {
+          // แปลงพิกัดจาก 0-1 เป็น canvas
+          indexTip = { x: index.x * CW, y: index.y * CH };
+          thumbTip = { x: thumb.x * CW, y: thumb.y * CH };
+          // ตรวจจับ pinch (ระยะห่าง < 30px)
+          const dist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+          pinch = dist < 32;
+        } else {
+          indexTip = null;
+          thumbTip = null;
+          pinch = false;
+        }
+      } else {
+        // ไม่เห็นมือ
+        indexTip = null;
+        thumbTip = null;
+        pinch = false;
+        // ถ้ากำลังถืออยู่ แต่ไม่เจอมือ -> ปล่อยผลไม้ (เพื่อไม่ให้ค้าง)
+        if (isHolding) {
+          dropFruit();
+        }
+      }
+      // อัปเดตเกมทุกเฟรม
+      updateGame();
+    }
+
+    // เริ่มต้น MediaPipe
+    const hands = new Hands({
+      locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+      }
     });
-  }
 
-  // Events
-  startBtn.addEventListener('click', startGame);
-  retryBtn.addEventListener('click', function() {
-    certModal.style.display = 'none';
-    startGame();
-  });
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.7,
+      minTrackingConfidence: 0.6
+    });
 
-  captureBtn.addEventListener('click', function() {
-    var name = playerNameInput.value || 'เด็กน้อย';
-    var inputEl = playerNameInput;
-    var tempType = inputEl.type;
-    inputEl.type = 'text';
-    
-    var card = document.getElementById('certCard');
-    if (typeof html2canvas !== 'undefined') {
-      html2canvas(card, { 
-        scale: 2, 
-        useCORS: true, 
-        backgroundColor: '#fef3c7',
-        logging: false
-      }).then(function(canvas2) {
-        var link = document.createElement('a');
-        var fileName = 'certificate_' + encodeURIComponent(name) + '.png';
-        link.download = fileName;
-        link.href = canvas2.toDataURL('image/png');
-        link.click();
-        inputEl.type = tempType;
-      }).catch(function() {
-        inputEl.type = tempType;
-      });
-    } else {
-      inputEl.type = tempType;
-    }
-  });
+    hands.onResults(onResults);
 
-  // Mouse/Touch drag
-  var mouseDown = false;
-  canvas.addEventListener('mousedown', function(e) {
-    if (!state.running) return;
-    var rect = canvas.getBoundingClientRect();
-    var mx = e.clientX - rect.left;
-    var my = e.clientY - rect.top;
-    for (var i = state.items.length - 1; i >= 0; i--) {
-      var item = state.items[i];
-      if (Math.sqrt((mx - item.x) * (mx - item.x) + (my - item.y) * (my - item.y)) < item.size / 1.5) {
-        state.dragging = { item: item, offsetX: item.x - mx, offsetY: item.y - my };
-        mouseDown = true;
-        break;
+    // เปิดกล้อง
+    const camera = new Camera(video, {
+      onFrame: async () => {
+        await hands.send({ image: video });
+      },
+      width: 800,
+      height: 600
+    });
+    camera.start();
+
+    // --- ปุ่มรีเซ็ต ---
+    resetBtn.addEventListener('click', () => {
+      resetGame();
+      // ถ้ากำลังถืออยู่ ให้ปล่อย
+      if (isHolding) {
+        dropFruit();
       }
-    }
-  });
-  canvas.addEventListener('mousemove', function(e) {
-    if (!mouseDown || !state.dragging) return;
-    var rect = canvas.getBoundingClientRect();
-    var mx = e.clientX - rect.left;
-    var my = e.clientY - rect.top;
-    state.dragging.item.x = mx + state.dragging.offsetX;
-    state.dragging.item.y = my + state.dragging.offsetY;
-  });
-  canvas.addEventListener('mouseup', function(e) {
-    if (mouseDown && state.dragging) {
-      var item = state.dragging.item;
-      if (item.y > state.basket.y && item.y < state.basket.y + state.basket.h + 10 &&
-          item.x > state.basket.x && item.x < state.basket.x + state.basket.w) {
-        if (state.mission && (item.name === state.mission.name)) {
-          state.score += 10; 
-          scoreLabel.innerHTML = '⭐ ' + state.score;
-          showFloatingText(item.x, item.y - 20, '+10', '#facc15');
-          playNote(state.mission); 
-          randomMission();
-          var idx = state.items.indexOf(item);
-          if (idx !== -1) state.items.splice(idx, 1);
-        } else { 
-          playError(); 
-          showFloatingText(item.x, item.y - 20, '❌', '#f87171'); 
-          var idx2 = state.items.indexOf(item);
-          if (idx2 !== -1) state.items.splice(idx2, 1);
-        }
-      }
-      state.dragging = null; 
-      mouseDown = false;
-    }
-  });
+      isHolding = false;
+      heldFruitIndex = -1;
+      pinch = false;
+      prevPinch = false;
+      indexTip = null;
+      thumbTip = null;
+      updateGame();
+    });
 
-  canvas.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    if (!state.running) return;
-    var touch = e.touches[0];
-    var rect = canvas.getBoundingClientRect();
-    var mx = touch.clientX - rect.left;
-    var my = touch.clientY - rect.top;
-    for (var i = state.items.length - 1; i >= 0; i--) {
-      var item = state.items[i];
-      if (Math.sqrt((mx - item.x) * (mx - item.x) + (my - item.y) * (my - item.y)) < item.size / 1.5) {
-        state.dragging = { item: item, offsetX: item.x - mx, offsetY: item.y - my };
-        break;
-      }
-    }
-  }, {passive: false});
-  canvas.addEventListener('touchmove', function(e) {
-    e.preventDefault();
-    if (!state.dragging) return;
-    var touch = e.touches[0];
-    var rect = canvas.getBoundingClientRect();
-    var mx = touch.clientX - rect.left;
-    var my = touch.clientY - rect.top;
-    state.dragging.item.x = mx + state.dragging.offsetX;
-    state.dragging.item.y = my + state.dragging.offsetY;
-  }, {passive: false});
-  canvas.addEventListener('touchend', function(e) {
-    e.preventDefault();
-    if (state.dragging) {
-      var item = state.dragging.item;
-      if (item.y > state.basket.y && item.y < state.basket.y + state.basket.h + 10 &&
-          item.x > state.basket.x && item.x < state.basket.x + state.basket.w) {
-        if (state.mission && (item.name === state.mission.name)) {
-          state.score += 10; 
-          scoreLabel.innerHTML = '⭐ ' + state.score;
-          showFloatingText(item.x, item.y - 20, '+10', '#facc15');
-          playNote(state.mission); 
-          randomMission();
-          var idx = state.items.indexOf(item);
-          if (idx !== -1) state.items.splice(idx, 1);
-        } else { 
-          playError(); 
-          showFloatingText(item.x, item.y - 20, '❌', '#f87171'); 
-          var idx2 = state.items.indexOf(item);
-          if (idx2 !== -1) state.items.splice(idx2, 1);
-        }
-      }
-      state.dragging = null;
-    }
-  }, {passive: false});
+    // --- เริ่มเกมครั้งแรก ---
+    resetGame();
+    // วาดครั้งแรก
+    updateGame();
 
-  resizeCanvas();
-})();
+    // (ไม่ต้องแสดงวิดีโอ เพราะใช้เป็น input เท่านั้น)
+  })();
 </script>
 </body>
 </html>
